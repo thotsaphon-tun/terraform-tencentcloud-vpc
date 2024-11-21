@@ -4,13 +4,8 @@ module "vpc" {
   vpc_cidr           = "10.0.0.0/16"
   availability_zones = ["ap-guangzhou-7", "ap-guangzhou-6"]
 
-  subnet_name  = "simple-vpc"
-  subnet_cidrs = ["10.0.0.0/24", "10.0.1.0/24"]
-
-  destination_cidrs = ["1.0.1.0/24"]
-  next_type         = ["VPN"]
-  next_hub          = ["0"]
-
+  private_subnets = ["10.0.0.0/24", "10.0.1.0/24"]
+  
   tags = {
     module = "vpc"
   }

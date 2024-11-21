@@ -4,7 +4,7 @@ This module will create new Subnet and Route rules with exists VPC.
 
 ## Usage
 
-To run this example, you need first replace the configuration like `vpc_id`, `subnet_name` etc, and then execute:
+To run this example, you need first replace the configuration like `vpc_id`, `private_subnets` etc, and then execute:
 
 ```bash
 $ terraform init
@@ -19,6 +19,4 @@ Note, this example may create resources which cost money. Run `terraform destroy
 | Name | Description |
 |------|-------------|
 | vpc_id | The id of vpc. |
-| subnet_id | The id of subnet. |
-| route_table_id | The id of route table. |
-| route_entry_id | The id of route table entry. |
+| private_subnet_id | The id of private subnet. |

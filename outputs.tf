@@ -3,19 +3,34 @@ output "vpc_id" {
   value       = var.vpc_id != "" ? var.vpc_id : concat(tencentcloud_vpc.vpc.*.id, [""])[0]
 }
 
-output "subnet_id" {
-  description = "The id of subnet."
-  value       = tencentcloud_subnet.subnet.*.id
+output "public_subnet_id" {
+  description = "The id of public subnet."
+  value       = tencentcloud_subnet.public.*.id
 }
 
-output "route_table_id" {
-  description = "The id of route table."
-  value       = local.route_table_id
+output "private_subnet_id" {
+  description = "The id of private subnet."
+  value       = tencentcloud_subnet.private.*.id
 }
 
-output "route_entry_id" {
-  description = "The id of route table entry."
-  value       = tencentcloud_route_table_entry.route_entry.*.id
+output "database_subnet_id" {
+  description = "The id of database subnet."
+  value       = tencentcloud_subnet.database.*.id
+}
+
+output "public_route_table_id" {
+  description = "The id of public route table."
+  value       = tencentcloud_route_table.public.*.id
+}
+
+output "private_route_table_id" {
+  description = "The id of private route table."
+  value       = tencentcloud_route_table.private.*.id
+}
+
+output "database_route_table_id" {
+  description = "The id of database route table."
+  value       = tencentcloud_route_table.database.*.id
 }
 
 output "availability_zones" {
@@ -36,11 +51,6 @@ output "vpn_gateway_id" {
 output "vpn_gateway_public_ip_address" {
   description = "The public ip address of the VPN Gateway"
   value       = try(tencentcloud_vpn_gateway.vpn[0].public_ip_address, "")
-}
-
-output "network_acl_id" {
-  description = "The ID of the network ACL"
-  value       = try(tencentcloud_vpc_acl.acl[0].id, "")
 }
 
 output "nat_gateway_id" {

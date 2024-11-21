@@ -10,24 +10,9 @@ variable "tags" {
   default     = {}
 }
 
-variable "cpu_core_count" {
-  description = "CPU core count used to query supported available zones."
-  default     = 1
-}
-
-variable "memory_size" {
-  description = "Memory size used to query supported available zones."
-  default     = 2
-}
-
-variable "gpu_core_count" {
-  description = "GPU core count used to query supported available zones."
-  default     = 0
-}
-
 variable "vpc_id" {
   description = "The vpc id used to launch resources."
-  default     = ""
+  default     = null
 }
 
 variable "vpc_name" {
@@ -57,16 +42,6 @@ variable "vpc_tags" {
   default     = {}
 }
 
-variable "subnet_name" {
-  description = "Specify the subnet name when 'vpc_id' is not specified."
-  default     = "subnet"
-}
-
-variable "subnet_cidrs" {
-  description = "Specify the subnet cidr blocks when 'vpc_id' is not specified."
-  type        = list(string)
-  default     = []
-}
 
 variable "subnet_is_multicast" {
   description = "Specify the subnet is multicast when 'vpc_id' is not specified."
@@ -85,33 +60,10 @@ variable "availability_zones" {
   default     = []
 }
 
-variable "create_route_table" {
-  description = "Controls if separate route table for subnets should be created"
-  type        = bool
-  default     = true
-}
-
-variable "route_table_id" {
-  description = "The route table id of router table in the specified vpc."
-  default     = ""
-}
-
-variable "destination_cidrs" {
-  description = "List of destination CIDR blocks of router table in the specified VPC."
-  type        = list(string)
-  default     = []
-}
-
-variable "next_type" {
-  description = "List of next hop types of router table in the specified vpc."
-  type        = list(string)
-  default     = []
-}
-
-variable "next_hub" {
-  description = "List of next hop gateway id of router table in the specified vpc."
-  type        = list(string)
-  default     = []
+variable "network_acl_tags" {
+  description = "Additional tags for the Network ACL"
+  type        = map(string)
+  default     = {}
 }
 
 variable "number_format" {
@@ -124,7 +76,218 @@ variable "route_table_tags" {
   type        = map(string)
   default     = {}
 }
-/* create vpn gateway in vpc */
+
+################################################################################
+# Publiс Subnets
+################################################################################
+variable "public_subnet_name" {
+  description = "Specify the public subnet name when 'vpc_id' is not specified."
+  default     = "public"
+}
+
+variable "public_subnets" {
+  description = "A list of public subnets inside the VPC"
+  type        = list(string)
+  default     = []
+}
+
+variable "create_multiple_public_route_tables" {
+  description = "Indicates whether to create a separate route table for each public subnet. Default: `false`"
+  type        = bool
+  default     = false
+}
+
+variable "public_subnet_suffix" {
+  description = "Suffix to append to public subnets name"
+  type        = string
+  default     = "public"
+}
+
+variable "public_subnet_tags" {
+  description = "Additional tags for the public subnets"
+  type        = map(string)
+  default     = {}
+}
+
+variable "public_route_table_tags" {
+  description = "Additional tags for the public route tables"
+  type        = map(string)
+  default     = {}
+}
+
+################################################################################
+# Public Network ACLs
+################################################################################
+
+variable "public_dedicated_network_acl" {
+  description = "Whether to use dedicated network ACL (not default) and custom rules for public subnets"
+  type        = bool
+  default     = false
+}
+
+variable "public_network_acl_ingress" {
+  description = "Public subnets inbound network ACLs, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
+  type        = list(string)
+  default     = null
+}
+
+variable "public_network_acl_egress" {
+  description = "Public subnets outbound network ACLs, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
+  type        = list(string)
+  default     = [
+    "ACCEPT#0.0.0.0/0#ALL#ALL"
+  ]
+}
+
+variable "public_acl_tags" {
+  description = "Additional tags for the public subnets network ACL"
+  type        = map(string)
+  default     = {}
+}
+
+
+################################################################################
+# Private Subnets
+################################################################################
+
+variable "private_subnets" {
+  description = "A list of private subnets inside the VPC"
+  type        = list(string)
+  default     = []
+}
+
+variable "create_multiple_private_route_tables" {
+  description = "Indicates whether to create a separate route table for each private subnet. Default: `false`"
+  type        = bool
+  default     = false
+}
+
+variable "private_subnet_name" {
+  description = "Specify the private subnet name when 'vpc_id' is not specified."
+  default     = "private"
+}
+
+variable "private_subnet_suffix" {
+  description = "Suffix to append to private subnets name"
+  type        = string
+  default     = "private"
+}
+
+variable "private_subnet_tags" {
+  description = "Additional tags for the private subnets"
+  type        = map(string)
+  default     = {}
+}
+
+variable "private_route_table_tags" {
+  description = "Additional tags for the private route tables"
+  type        = map(string)
+  default     = {}
+}
+
+################################################################################
+# Private Network ACLs
+################################################################################
+
+variable "private_dedicated_network_acl" {
+  description = "Whether to use dedicated network ACL (not default) and custom rules for private subnets"
+  type        = bool
+  default     = false
+}
+
+variable "private_network_acl_ingress" {
+  description = "Private subnets inbound network ACLs, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
+  type        = list(string)
+  default     = null
+}
+
+variable "private_network_acl_egress" {
+  description = "Private subnets outbound network ACLs, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
+  type        = list(string)
+  default     = [
+    "ACCEPT#0.0.0.0/0#ALL#ALL"
+  ]
+}
+
+variable "private_acl_tags" {
+  description = "Additional tags for the private subnets network ACL"
+  type        = map(string)
+  default     = {}
+}
+
+
+################################################################################
+# Database Subnets
+################################################################################
+
+variable "database_subnets" {
+  description = "A list of database subnets inside the VPC"
+  type        = list(string)
+  default     = []
+}
+
+variable "create_multiple_database_route_tables" {
+  description = "Indicates whether to create a separate route table for each database subnet. Default: `false`"
+  type        = bool
+  default     = false
+}
+
+variable "database_subnet_name" {
+  description = "Specify the database subnet name when 'vpc_id' is not specified."
+  default     = "database"
+}
+
+variable "database_subnet_suffix" {
+  description = "Suffix to append to database subnets name"
+  type        = string
+  default     = "database"
+}
+
+variable "database_subnet_tags" {
+  description = "Additional tags for the database subnets"
+  type        = map(string)
+  default     = {}
+}
+
+variable "database_route_table_tags" {
+  description = "Additional tags for the database route tables"
+  type        = map(string)
+  default     = {}
+}
+
+################################################################################
+# Database Network ACLs
+################################################################################
+
+variable "database_dedicated_network_acl" {
+  description = "Whether to use dedicated network ACL (not default) and custom rules for database subnets"
+  type        = bool
+  default     = false
+}
+
+variable "database_network_acl_ingress" {
+  description = "Database subnets inbound network ACLs, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
+  type        = list(string)
+  default     = null
+}
+
+variable "database_network_acl_egress" {
+  description = "Database subnets outbound network ACLs, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
+  type        = list(string)
+  default     = [
+    "ACCEPT#0.0.0.0/0#ALL#ALL"
+  ]
+}
+
+variable "database_acl_tags" {
+  description = "Additional tags for the database subnets network ACL"
+  type        = map(string)
+  default     = {}
+}
+
+################################################################################
+# VPN Gateway
+################################################################################
 variable "enable_vpn_gateway" {
   description = "Should be true if you want to create a new VPN Gateway resource and attach it to the VPC"
   type        = bool
@@ -161,45 +324,20 @@ variable "vpn_gateway_tags" {
   default     = {}
 }
 
-/* enable ACL to subnets */
-variable "manage_network_acl" {
-  description = "Should be true to adopt and manage Network ACL for subnets"
-  type        = bool
-  default     = false
-}
-
-variable "network_acl_name" {
-  description = "Name to be used on Network ACL"
-  type        = string
-  default     = ""
-}
-
-variable "network_acl_tags" {
-  description = "Additional tags for the Network ACL"
-  type        = map(string)
-  default     = {}
-}
-
-variable "network_acl_ingress" {
-  description = "List of strings of ingress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
-  type        = list(string)
-
-  default = null
-}
-
-variable "network_acl_egress" {
-  description = "List of strings of egress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`"
-  type        = list(string)
-
-  default = [
-    "ACCEPT#0.0.0.0/0#ALL#ALL"
-  ]
-}
+################################################################################
+# NAT Gateway
+################################################################################
 
 variable "enable_nat_gateway" {
-  description = "Should be true if you want to provision NAT Gateways for vpc."
+  description = "Should be true if you want to provision NAT Gateways for each of your private networks"
   type        = bool
   default     = false
+}
+
+variable "num_allocated_nat_ips" {
+  description = "number of allocated NAT IPs in case `nat_public_ips` is not specifies."
+  type        = number
+  default     = 1
 }
 
 variable "nat_gateway_bandwidth" {

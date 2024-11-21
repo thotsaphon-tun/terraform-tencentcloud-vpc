@@ -1,27 +1,26 @@
-data "tencentcloud_instance_types" "default" {
-  cpu_core_count   = var.cpu_core_count
-  gpu_core_count   = var.gpu_core_count
-  memory_size      = var.memory_size
-  exclude_sold_out = true
-}
-
-data "tencentcloud_vpc_route_tables" "default" {
-  vpc_id           = var.vpc_id
-  association_main = true
+data "tencentcloud_availability_zones_by_product" "available_zones" {
+  product = "cvm"
 }
 
 locals {
-  create_vpc         = var.create_vpc
-  custom_route_table = var.create_route_table == false || local.create_vpc ? false : length(var.destination_cidrs) > 0
-  availability_zones = length(var.availability_zones) > 0 ? var.availability_zones : data.tencentcloud_instance_types.default.instance_types.*.availability_zone
-  route_table_id = var.route_table_id != "" ? var.route_table_id : local.custom_route_table ? tencentcloud_route_table.route_table[0].id : local.create_vpc ? tencentcloud_vpc.vpc[0].default_route_table_id : try(
-    data.tencentcloud_vpc_route_tables.default.instance_list[0].route_table_id,
-    null
+  len_public_subnets      = length(var.public_subnets)
+  len_private_subnets     = length(var.private_subnets)
+  len_database_subnets    = length(var.database_subnets)
+
+  max_subnet_length = max(
+    local.len_private_subnets,
+    local.len_public_subnets,
+    local.len_database_subnets,
   )
+
+  vpc_id             = var.vpc_id == null ? tencentcloud_vpc.vpc[0].id : var.vpc_id
+  create_vpc         = var.vpc_id == null ? var.create_vpc : false
+  availability_zones = length(var.availability_zones) > 0 ? var.availability_zones : data.tencentcloud_availability_zones_by_product.available_zones.zones.*.name
 }
 
 resource "tencentcloud_vpc" "vpc" {
   count        = local.create_vpc ? 1 : 0
+
   name         = var.vpc_name
   cidr_block   = var.vpc_cidr
   is_multicast = var.vpc_is_multicast
@@ -29,35 +28,215 @@ resource "tencentcloud_vpc" "vpc" {
   tags         = merge(var.tags, var.vpc_tags)
 }
 
-resource "tencentcloud_route_table" "route_table" {
-  count  = local.custom_route_table ? 1 : 0
-  name   = "${var.subnet_name}-route"
-  vpc_id = var.vpc_id != "" ? var.vpc_id : tencentcloud_vpc.vpc[0].id
+################################################################################
+# Publiс Subnets
+################################################################################
+
+locals {
+  create_public_subnets = local.create_vpc && local.len_public_subnets > 0
+}
+
+resource "tencentcloud_subnet" "public" {
+  count             = local.create_public_subnets ? local.len_public_subnets : 0
+  name              = format("%s_%s", var.public_subnet_name, format(var.number_format, count.index + 1))
+  vpc_id            = local.vpc_id
+  cidr_block        = element(concat(var.public_subnets, [""]), count.index)
+  is_multicast      = var.subnet_is_multicast
+  availability_zone = element(local.availability_zones, count.index)
+  tags              = merge(var.tags, var.public_subnet_tags)
+}
+
+locals {
+  num_public_route_tables = var.create_multiple_public_route_tables ? local.len_public_subnets : 1
+}
+
+resource "tencentcloud_route_table" "public" {
+  count = local.create_public_subnets ? local.num_public_route_tables : 0
+
+  name   = var.create_multiple_public_route_tables ? format(
+    "${var.vpc_name}-${var.public_subnet_suffix}-%s",
+    element(local.availability_zones, count.index),
+  ) : "${var.vpc_name}-${var.public_subnet_suffix}"
+  vpc_id = local.vpc_id
   tags = merge(
     var.tags,
-    var.route_table_tags
+    var.public_route_table_tags
   )
 }
 
-resource "tencentcloud_subnet" "subnet" {
-  count             = length(var.subnet_cidrs)
-  name              = length(var.subnet_cidrs) < 2 ? var.subnet_name : format("%s_%s", var.subnet_name, format(var.number_format, count.index + 1))
-  vpc_id            = var.vpc_id != "" ? var.vpc_id : tencentcloud_vpc.vpc[0].id
-  cidr_block        = var.subnet_cidrs[count.index]
+resource "tencentcloud_route_table_association" "public" {
+  count = local.create_public_subnets ? local.len_public_subnets : 0
+
+  subnet_id      = element(tencentcloud_subnet.public[*].id, count.index)
+  route_table_id = element(tencentcloud_route_table.public[*].id, var.create_multiple_public_route_tables ? count.index : 0)
+}
+
+################################################################################
+# Public Network ACLs
+################################################################################
+
+resource "tencentcloud_vpc_acl" "public" {
+  count = local.create_public_subnets && var.public_dedicated_network_acl ? 1 : 0
+
+  name       = "${var.vpc_name}-${var.public_subnet_suffix}"
+  vpc_id     = local.vpc_id
+  ingress    = var.public_network_acl_ingress
+  egress     = var.public_network_acl_egress
+
+  tags = merge(
+    var.tags,
+    var.public_acl_tags,
+  )
+}
+
+resource "tencentcloud_vpc_acl_attachment" "public" {
+  count     = local.create_public_subnets && var.public_dedicated_network_acl ? local.len_public_subnets : 0
+  acl_id    = tencentcloud_vpc_acl.public[0].id
+  subnet_id = tencentcloud_subnet.public[count.index].id
+}
+
+################################################################################
+# Private Subnets
+################################################################################
+
+locals {
+  create_private_subnets = local.create_vpc && local.len_private_subnets > 0
+}
+
+resource "tencentcloud_subnet" "private" {
+  count             = local.create_private_subnets ? local.len_private_subnets : 0
+  name              = format("%s_%s", var.private_subnet_name, format(var.number_format, count.index + 1))
+  vpc_id            = local.vpc_id
+  cidr_block        = element(concat(var.private_subnets, [""]), count.index)
   is_multicast      = var.subnet_is_multicast
-  availability_zone = local.availability_zones[count.index % length(local.availability_zones)]
-  route_table_id    = local.route_table_id
-  tags              = merge(var.tags, var.subnet_tags)
+  availability_zone = element(local.availability_zones, count.index)
+  tags              = merge(var.tags, var.private_subnet_tags)
 }
 
-resource "tencentcloud_route_table_entry" "route_entry" {
-  count                  = length(var.destination_cidrs)
-  route_table_id         = local.route_table_id
-  destination_cidr_block = var.destination_cidrs[count.index]
-  next_type              = var.next_type[count.index]
-  next_hub               = var.next_type[count.index] == "NAT" && var.enable_nat_gateway && var.next_hub[count.index] == "0" ? tencentcloud_nat_gateway.nat[0].id : var.next_type[count.index] == "VPN" && var.enable_vpn_gateway && var.next_hub[count.index] == "0" ? tencentcloud_vpn_gateway.vpn[0].id : var.next_hub[count.index]
+locals {
+  num_private_route_tables = var.create_multiple_private_route_tables ? local.len_private_subnets : 1
 }
 
+resource "tencentcloud_route_table" "private" {
+  count = local.create_private_subnets ? local.num_private_route_tables : 0
+
+  name   = var.create_multiple_private_route_tables ? format(
+    "${var.vpc_name}-${var.private_subnet_suffix}-%s",
+    element(local.availability_zones, count.index),
+  ) : "${var.vpc_name}-${var.private_subnet_suffix}"
+  vpc_id = local.vpc_id
+  tags = merge(
+    var.tags,
+    var.private_route_table_tags
+  )
+}
+
+resource "tencentcloud_route_table_association" "private" {
+  count = local.create_private_subnets ? local.len_private_subnets : 0
+
+  subnet_id      = element(tencentcloud_subnet.private[*].id, count.index)
+  route_table_id = element(tencentcloud_route_table.private[*].id, var.create_multiple_private_route_tables ? count.index : 0)
+}
+
+resource "tencentcloud_route_table_entry" "private_to_nat" {
+  count = var.enable_nat_gateway ? local.num_private_route_tables : 0
+
+  route_table_id         = element(tencentcloud_route_table.private[*].id, var.create_multiple_private_route_tables ? count.index : 0)
+  destination_cidr_block = "0.0.0.0/0"
+  next_type              = "NAT"
+  next_hub               = tencentcloud_nat_gateway.nat[0].id
+}
+
+################################################################################
+# Private Network ACLs
+################################################################################
+
+resource "tencentcloud_vpc_acl" "private" {
+  count = local.create_private_subnets && var.private_dedicated_network_acl ? 1 : 0
+
+  name       = "${var.vpc_name}-${var.private_subnet_suffix}"
+  vpc_id     = local.vpc_id
+  ingress    = var.private_network_acl_ingress
+  egress     = var.private_network_acl_egress
+
+  tags = merge(
+    var.tags,
+    var.private_acl_tags,
+  )
+}
+
+resource "tencentcloud_vpc_acl_attachment" "private" {
+  count     = local.create_private_subnets && var.private_dedicated_network_acl ? local.len_private_subnets : 0
+  acl_id    = tencentcloud_vpc_acl.private[0].id
+  subnet_id = tencentcloud_subnet.private[count.index].id
+}
+
+################################################################################
+# Database Subnets
+################################################################################
+
+locals {
+  create_database_subnets = local.create_vpc && local.len_database_subnets > 0
+}
+
+resource "tencentcloud_subnet" "database" {
+  count             = local.create_database_subnets ? local.len_database_subnets : 0
+  name              = format("%s_%s", var.database_subnet_name, format(var.number_format, count.index + 1))
+  vpc_id            = local.vpc_id
+  cidr_block        = element(concat(var.database_subnets, [""]), count.index)
+  is_multicast      = var.subnet_is_multicast
+  availability_zone = element(local.availability_zones, count.index)
+  tags              = merge(var.tags, var.database_subnet_tags)
+}
+
+locals {
+  num_database_route_tables = var.create_multiple_database_route_tables ? local.len_database_subnets : 1
+}
+
+resource "tencentcloud_route_table" "database" {
+  count = local.create_database_subnets ? local.num_database_route_tables : 0
+
+  name   = var.create_multiple_database_route_tables ? format(
+    "${var.vpc_name}-${var.database_subnet_suffix}-%s",
+    element(local.availability_zones, count.index),
+  ) : "${var.vpc_name}-${var.database_subnet_suffix}"
+  vpc_id = local.vpc_id
+  tags = merge(
+    var.tags,
+    var.database_route_table_tags
+  )
+}
+
+resource "tencentcloud_route_table_association" "database" {
+  count = local.create_database_subnets ? local.len_database_subnets : 0
+
+  subnet_id      = element(tencentcloud_subnet.database[*].id, count.index)
+  route_table_id = element(tencentcloud_route_table.database[*].id, var.create_multiple_database_route_tables ? count.index : 0)
+}
+
+################################################################################
+# Database Network ACLs
+################################################################################
+
+resource "tencentcloud_vpc_acl" "database" {
+  count = local.create_database_subnets && var.database_dedicated_network_acl ? 1 : 0
+
+  name       = "${var.vpc_name}-${var.database_subnet_suffix}"
+  vpc_id     = local.vpc_id
+  ingress    = var.database_network_acl_ingress
+  egress     = var.database_network_acl_egress
+
+  tags = merge(
+    var.tags,
+    var.database_acl_tags,
+  )
+}
+
+resource "tencentcloud_vpc_acl_attachment" "database" {
+  count     = local.create_database_subnets && var.database_dedicated_network_acl ? local.len_database_subnets : 0
+  acl_id    = tencentcloud_vpc_acl.database[0].id
+  subnet_id = tencentcloud_subnet.database[count.index].id
+}
 
 ################################################################################
 # VPN Gateway
@@ -77,37 +256,12 @@ resource "tencentcloud_vpn_gateway" "vpn" {
   )
 }
 
-
-################################################################################
-# Network ACL
-################################################################################
-resource "tencentcloud_vpc_acl" "acl" {
-  count   = var.manage_network_acl ? 1 : 0
-  vpc_id  = var.vpc_id != "" ? var.vpc_id : tencentcloud_vpc.vpc[0].id
-  name    = var.network_acl_name != "" ? var.network_acl_name : "acl-${var.subnet_name}"
-  ingress = var.network_acl_ingress
-  egress  = var.network_acl_egress
-
-  tags = merge(
-    var.tags,
-    var.network_acl_tags,
-  )
-}
-
-resource "tencentcloud_vpc_acl_attachment" "attachment" {
-  count     = var.manage_network_acl ? length(tencentcloud_subnet.subnet) : 0
-  acl_id    = tencentcloud_vpc_acl.acl[0].id
-  subnet_id = tencentcloud_subnet.subnet[count.index].id
-}
-
-
-
 ################################################################################
 # NAT
 ################################################################################
 resource "tencentcloud_eip" "nat_eip" {
-  count = var.enable_nat_gateway && length(var.nat_public_ips) == 0 ? 1 : 0
-  name  = "${var.subnet_name}-natip"
+  count = var.enable_nat_gateway && length(var.nat_public_ips) == 0 ? var.num_allocated_nat_ips : 0
+  name  = "${var.vpc_name}-natip-${count.index}"
   tags = merge(
     var.tags,
     var.nat_gateway_tags
@@ -116,8 +270,8 @@ resource "tencentcloud_eip" "nat_eip" {
 
 resource "tencentcloud_nat_gateway" "nat" {
   count            = var.enable_nat_gateway ? 1 : 0
-  name             = "${var.subnet_name}-nat"
-  vpc_id           = var.vpc_id != "" ? var.vpc_id : tencentcloud_vpc.vpc[0].id
+  name             = "${var.vpc_name}-nat"
+  vpc_id           = local.vpc_id
   bandwidth        = var.nat_gateway_bandwidth
   max_concurrent   = var.nat_gateway_concurrent
   assigned_eip_set = length(var.nat_public_ips) > 0 ? var.nat_public_ips : tencentcloud_eip.nat_eip.*.public_ip

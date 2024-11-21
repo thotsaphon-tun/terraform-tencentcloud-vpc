@@ -20,12 +20,7 @@ module "vpc" {
   vpc_name = "simple-vpc"
   vpc_cidr = "10.0.0.0/16"
 
-  subnet_name  = "simple-vpc"
-  subnet_cidrs = ["10.0.0.0/24"]
-
-  destination_cidrs = ["1.0.1.0/24"]
-  next_type         = ["EIP"]
-  next_hub          = ["0"]
+  private_subnets = ["10.0.0.0/24"]
 
   tags = {
     module = "vpc"
@@ -51,9 +46,6 @@ It is possible to use existing VPC when specify `vpc_id` parameter.
 | Name                          | Description                                                                                                                                                    |     Type     |    Default    | Required |
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|:------------:|:-------------:|:--------:|
 | tags                          | A map of tags to add to all resources.                                                                                                                         | map(string)  |      {}       |    no    |
-| cpu_core_count                | CPU core count used to query supported available zones.                                                                                                        |    number    |       1       |    no    |
-| memory_size                   | Memory size used to query supported available zones.                                                                                                           |    number    |       2       |    no    |
-| gpu_core_count                | GPU core count used to query supported available zones.                                                                                                        |    number    |       0       |    no    |
 | create_vpc                    | -                                                                                                                                                              |     bool     |     true      |    no    |
 | vpc_id                        | The vpc id used to launch resources.                                                                                                                           |    string    |      ""       |    no    |
 | vpc_name                      | The vpc name used to launch a new vpc when 'vpc_id' is not specified.                                                                                          |    string    |    my-vpc     |    no    |
@@ -61,17 +53,28 @@ It is possible to use existing VPC when specify `vpc_id` parameter.
 | vpc_is_multicast              | Specify the vpc is multicast when 'vpc_id' is not specified.                                                                                                   |     bool     |     true      |    no    |
 | vpc_dns_servers               | Specify the vpc dns servers when 'vpc_id' is not specified.                                                                                                    | list(string) |      []       |    no    |
 | vpc_tags                      | Additional tags for the vpc.                                                                                                                                   | map(string)  |      {}       |    no    |
-| subnet_name                   | Specify the subnet name when 'vpc_id' is not specified.                                                                                                        |    string    |    subnet     |    no    |
-| subnet_cidrs                  | Specify the subnet cidr blocks when 'vpc_id' is not specified.                                                                                                 | list(string) |      []       |    no    |
 | subnet_is_multicast           | Specify the subnet is multicast when 'vpc_id' is not specified.                                                                                                |     bool     |     true      |    no    |
 | subnet_tags                   | Additional tags for the subnet.                                                                                                                                | map(string)  |      {}       |    no    |
 | availability_zones            | List of available zones to launch resources.                                                                                                                   | list(string) |      []       |    no    |
-| create_route_table            | -                                                                                                                                                              |     bool     |     true      |    no    |
-| route_table_id                | The route table id of router table in the specified vpc.                                                                                                       |    string    |      ""       |    no    |
-| destination_cidrs             | List of destination CIDR blocks of router table in the specified VPC.                                                                                          | list(string) |      []       |    no    |
-| next_type                     | List of next hop types of router table in the specified vpc.                                                                                                   | list(string) |      []       |    no    |
-| next_hub                      | List of next hop gateway id of router table in the specified vpc.                                                                                              | list(string) |      []       |    no    |
 | route_table_tags              | Additional tags for the route table.                                                                                                                           | map(string)  |      {}       |    no    |
+| public_subnet_name            | Specify the public subnet name when 'vpc_id' is not specified.                                                                                                 | string      | public     |   no     |
+| public_subnets                | Specify the public subnet cidr blocks when 'vpc_id' is not specified.                                                                                                 | list(string) |      []       |    no    |
+| create_multiple_public_route_tables | Indicates whether to create a separate route table for each public subnet. Default: `false` | bool | false | no |
+| public_subnet_suffix              | Suffix to append to public subnets name                              | string      | public           |      no     |
+| public_subnet_tags                | Additional tags for the public subnets                               | map(string)  |     {}       |    no    |
+| public_route_table_tags           | Additional tags for the public route tables                          | map(string)  |     {}       |    no    |
+| private_subnet_name            | Specify the private subnet name when 'vpc_id' is not specified.                                                                                                 | string      | private     |   no     |
+| private_subnets                | Specify the private subnet cidr blocks when 'vpc_id' is not specified.                                                                                                 | list(string) |      []       |    no    |
+| create_multiple_private_route_tables | Indicates whether to create a separate route table for each private subnet. Default: `false` | bool | false | no |
+| private_subnet_suffix              | Suffix to append to private subnets name                              | string      | private           |      no     |
+| private_subnet_tags                | Additional tags for the private subnets                               | map(string)  |     {}       |    no    |
+| private_route_table_tags           | Additional tags for the private route tables                          | map(string)  |     {}       |    no    |
+| database_subnet_name            | Specify the database subnet name when 'vpc_id' is not specified.                                                                                                 | string      | database     |   no     |
+| database_subnets                | Specify the database subnet cidr blocks when 'vpc_id' is not specified.                                                                                                 | list(string) |      []       |    no    |
+| create_multiple_database_route_tables | Indicates whether to create a separate route table for each database subnet. Default: `false` | bool | false | no |
+| database_subnet_suffix              | Suffix to append to database subnets name                              | string      | database           |      no     |
+| database_subnet_tags                | Additional tags for the database subnets                               | map(string)  |     {}       |    no    |
+| database_route_table_tags           | Additional tags for the database route tables                          | map(string)  |     {}       |    no    |
 | enable_vpn_gateway            | Create a new VPN Gateway resource and attach it to the VPC                                                                                                     |     bool     |     false     |    no    |
 | vpn_gateway_bandwidth         | bandwidth of VPN Gateway                                                                                                                                       |    number    |       5       |    no    |
 | vpn_gateway_max_connection    | Maximum number of connected clients allowed for the SSL VPN gateway. Valid values: [5, 10, 20, 50, 100]. This parameter is only required for SSL VPN gateways. |    number    |       5       |    no    |
@@ -79,11 +82,21 @@ It is possible to use existing VPC when specify `vpc_id` parameter.
 | vpn_gateway_availability_zone | The Availability Zone for the VPN Gateway                                                                                                                      |    string    |      ""       |    no    |
 | vpn_gateway_tags              | Additional tags for the VPN gateway                                                                                                                            | map(string)  |      {}       |    no    |
 | manage_network_acl            | Should be true to adopt and manage Network ACL for subnets                                                                                                     |     bool     |     false     |    no    |
-| network_acl_name              | Name to be used on Network ACL                                                                                                                                 |    string    |     null      |    no    |
 | network_acl_tags              | Additional tags for the Network ACL                                                                                                                            | map(string)  |      {}       |    no    |
-| network_acl_ingress           | List of strings of ingress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                     | list(string) |     null      |    no    |
-| network_acl_egress            | List of strings of egress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                      | list(string) |     null      |    no    |
+| public_dedicated_network_acl         | Whether to use dedicated network ACL (not default) and custom rules for public subnets | bool | false |  no  |
+| private_dedicated_network_acl         | Whether to use dedicated network ACL (not default) and custom rules for private subnets | bool | false |  no  |
+| database_dedicated_network_acl         | Whether to use dedicated network ACL (not default) and custom rules for database subnets | bool | false |  no  |
+| public_network_acl_ingress           | List of strings of ingress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                     | list(string) |     null      |    no    |
+| public_network_acl_egress            | List of strings of egress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                      | list(string) |     null      |    no    |
+| pivate_network_acl_ingress           | List of strings of ingress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                     | list(string) |     null      |    no    |
+| private_network_acl_egress            | List of strings of egress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                      | list(string) |     null      |    no    |
+| database_network_acl_ingress           | List of strings of ingress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                     | list(string) |     null      |    no    |
+| database_network_acl_egress            | List of strings of egress rules to set on the Network ACL, eg: `ACCEPT#0.0.0.0/0#ALL#ALL`                                                                      | list(string) |     null      |    no    |
+| public_acl_tags               | Additional tags for the public subnets network ACL                  | map(string)  | {} | no |
+| private_acl_tags               | Additional tags for the private subnets network ACL                  | map(string)  | {} | no |
+| database_acl_tags               | Additional tags for the database subnets network ACL                  | map(string)  | {} | no |
 | enable_nat_gateway            | Should be true if you want to provision NAT Gateways for vpc.                                                                                                  |     bool     |     false     |    no    |
+| num_allocated_nat_ips         | number of allocated NAT IPs in case `nat_public_ips` is not specifies.  | number    |  1 |  no  |
 | nat_gateway_bandwidth         | bandwidth of NAT Gateway                                                                                                                                       |    number    |      100      |    no    |
 | nat_gateway_concurrent        | concurrency of NAT Gateway                                                                                                                                     |    number    |    1000000    |    no    |
 | nat_gateway_tags              | Additional tags for the NAT gateway                                                                                                                            | map(string)  |      {}       |    no    |
@@ -94,9 +107,12 @@ It is possible to use existing VPC when specify `vpc_id` parameter.
 | Name                          | Description                              |
 |-------------------------------|------------------------------------------|
 | vpc_id                        | The id of vpc.                           |
-| subnet_id                     | The ids of subnet.                       |
-| route_table_id                | The id of route table.                   |
-| route_entry_id                | The ids of route table entry.            |
+| public_subnet_id              | The ids of public subnet.                |
+| private_subnet_id             | The ids of private subnet.               |
+| database_subnet_id            | The ids of database subnet.              |
+| public_route_table_id         | The id of public route table.            |
+| private_route_table_id        | The id of private route table.           |
+| database_route_table_id       | The id of database route table.          |
 | availability_zones            | The availability zones of instance type. |
 | tags                          | The tags of vpc.                         |
 | vpn_gateway_id                | The ID of the VPN Gateway                |

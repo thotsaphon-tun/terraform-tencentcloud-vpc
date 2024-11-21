@@ -3,16 +3,15 @@ output "vpc_id" {
   value       = module.vpc.vpc_id
 }
 
-output "route_table_id" {
-  description = "The id of route table."
-  value       = module.vpc.route_table_id
-}
-
 output "vpn_gateway_id" {
   description = "The id of route table."
   value       = module.vpc.vpn_gateway_id
 }
 
+output "private_subnet_id" {
+  description = "The id of private subnet."
+  value       = module.vpc.private_subnet_id
+}
 
 output "vpn_gateway_public_ip_address" {
   description = "The id of route table."
